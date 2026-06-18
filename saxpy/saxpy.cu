@@ -68,9 +68,12 @@ void saxpyCuda(int N, float alpha, float* xarray, float* yarray, float* resultar
     
     //
     // CS149 TODO: allocate device memory buffers on the GPU using cudaMalloc.
-    cudaMalloc(&device_x, N*sizeof(float)); 
-    cudaMalloc(&device_y, N*sizeof(float));
-    cudaMalloc(&device_result, N*sizeof(float));
+    // cudaMalloc(&device_x, N*sizeof(float)); 
+    // cudaMalloc(&device_y, N*sizeof(float));
+    // cudaMalloc(&device_result, N*sizeof(float));
+    cudaMallocManaged(&device_x, N*sizeof(float));
+    cudaMallocManaged(&device_y, N*sizeof(float));
+    cudaMallocManaged(&device_result, N*sizeof(float));
 
     //
     // We highly recommend taking a look at NVIDIA's

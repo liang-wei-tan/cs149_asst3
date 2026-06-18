@@ -50,3 +50,22 @@ The full process timer measure data movement time from host to device, execution
 PCIe3 which my system seems to be on gives a theoretical bandwidth of 15GBPS but the values i observe is 6GBPS which is off by 50%.
 
 
+## Using Allocate Unified Memory cudaMallocManaged
+some new API - performance seems worse
+./cudaSaxpy 
+---------------------------------------------------------
+Found 1 CUDA devices
+Device 0: NVIDIA GeForce RTX 3060
+   SMs:        28
+   Global mem: 12037 MB
+   CUDA Cap:   8.6
+---------------------------------------------------------
+Running 3 timing tests:
+Effective BW by CUDA saxpy: 52.078 ms           [4.292 GB/s]
+Kernel execution time: 9.879 ms
+Effective BW by CUDA saxpy: 51.197 ms           [4.366 GB/s]
+Kernel execution time: 9.379 ms
+Effective BW by CUDA saxpy: 50.940 ms           [4.388 GB/s]
+Kernel execution time: 9.799 ms
+
+
