@@ -51,7 +51,7 @@ PCIe3 which my system seems to be on gives a theoretical bandwidth of 15GBPS but
 
 
 ## Using Allocate Unified Memory cudaMallocManaged
-some new API - performance seems worse
+some new API - performance seems worse, execution time increase probably from dyanmic loading.
 ./cudaSaxpy 
 ---------------------------------------------------------
 Found 1 CUDA devices
@@ -61,11 +61,27 @@ Device 0: NVIDIA GeForce RTX 3060
    CUDA Cap:   8.6
 ---------------------------------------------------------
 Running 3 timing tests:
-Effective BW by CUDA saxpy: 37.522 ms           [5.957 GB/s]
-Kernel execution time: 30.126 ms
-Effective BW by CUDA saxpy: 36.726 ms           [6.086 GB/s]
-Kernel execution time: 30.226 ms
-Effective BW by CUDA saxpy: 37.276 ms           [5.996 GB/s]
-Kernel execution time: 30.766 ms
+Effective BW by CUDA saxpy: 63.551 ms           [3.517 GB/s]
+Kernel execution time: 51.562 ms
+Effective BW by CUDA saxpy: 61.767 ms           [3.619 GB/s]
+Kernel execution time: 49.835 ms
+Effective BW by CUDA saxpy: 62.495 ms           [3.577 GB/s]
+Kernel execution time: 50.591 ms
 
-
+## after using cudaMemPrefetchAsync
+stills slower than vanilla cuda malloc and copy
+./cudaSaxpy 
+---------------------------------------------------------
+Found 1 CUDA devices
+Device 0: NVIDIA GeForce RTX 3060
+   SMs:        28
+   Global mem: 12037 MB
+   CUDA Cap:   8.6
+---------------------------------------------------------
+Running 3 timing tests:
+Effective BW by CUDA saxpy: 49.151 ms           [4.548 GB/s]
+Kernel execution time: 23.118 ms
+Effective BW by CUDA saxpy: 47.991 ms           [4.657 GB/s]
+Kernel execution time: 21.456 ms
+Effective BW by CUDA saxpy: 47.066 ms           [4.749 GB/s]
+Kernel execution time: 20.962 ms

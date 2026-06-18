@@ -62,18 +62,27 @@ void saxpyCuda(int N, float alpha, float* xarray, float* yarray, float* resultar
     // above) but you cannot access the contents these buffers from
     // this thread. CPU threads cannot issue loads and stores from GPU
     // memory!
-    float* device_x = nullptr;
-    float* device_y = nullptr;
-    float* device_result = nullptr;
+    // float* device_x = xarray;
+    // float* device_y = yarray;
+    // float* device_result = resultarray;
+
+    float *device_x, *device_y, *device_result;
+    cudaMallocManaged(&device_x, N*sizeof(float));
+    cudaMallocManaged(&device_y, N*sizeof(float));
+    cudaMallocManaged(&device_result, N*sizeof(float));
+
+    for (int i=0; i<N; i++) {
+        device_x[i] = i % 10;
+        device_y[i] = i % 10;
+        device_result[i] = 0.f;
+   }
+
     
     //
     // CS149 TODO: allocate device memory buffers on the GPU using cudaMalloc.
     // cudaMalloc(&device_x, N*sizeof(float)); 
     // cudaMalloc(&device_y, N*sizeof(float));
     // cudaMalloc(&device_result, N*sizeof(float));
-    cudaMallocManaged(&device_x, N*sizeof(float));
-    cudaMallocManaged(&device_y, N*sizeof(float));
-    cudaMallocManaged(&device_result, N*sizeof(float));
 
     //
     // We highly recommend taking a look at NVIDIA's
@@ -91,7 +100,11 @@ void saxpyCuda(int N, float alpha, float* xarray, float* yarray, float* resultar
     // cudaMemcpy(device_x, xarray, N*sizeof(float), cudaMemcpyHostToDevice);
     // cudaMemcpy(device_y, yarray, N*sizeof(float), cudaMemcpyHostToDevice);
 
-   
+   // Prefetch the x and y arrays to the GPU
+    cudaMemPrefetchAsync(device_x, N*sizeof(float), 0, 0);
+    cudaMemPrefetchAsync(device_y, N*sizeof(float), 0, 0);
+
+
     // run CUDA kernel. (notice the <<< >>> brackets indicating a CUDA
     // kernel launch) Execution on the GPU occurs here.
     double kernalStartTime = CycleTimer::currentSeconds();
