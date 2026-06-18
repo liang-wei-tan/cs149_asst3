@@ -17,10 +17,10 @@ else
 endif
 
 OBJDIR=objs
-CXXFLAGS=-O3 -Wall
+CXXFLAGS=-O3 -Wall -I/usr/local/cuda/include
 ifeq ($(ARCH), Darwin)
 # Building on mac
-LDFLAGS=-L/usr/local/depot/cuda-8.0/lib/ -lcudart
+LDFLAGS=-I/usr/local/cuda/include -L/usr/local/depot/cuda-8.0/lib/ -lcudart
 else
 # Building on Linux
 LDFLAGS=-L/usr/local/cuda/lib64/ -lcudart

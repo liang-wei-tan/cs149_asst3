@@ -85,3 +85,23 @@ Effective BW by CUDA saxpy: 47.991 ms           [4.657 GB/s]
 Kernel execution time: 21.456 ms
 Effective BW by CUDA saxpy: 47.066 ms           [4.749 GB/s]
 Kernel execution time: 20.962 ms
+
+
+## Using cudaMallocHost 
+to avoid page faults and uncontiguous physical memory
+good speedup in memory movement speed. 
+./cudaSaxpy 
+---------------------------------------------------------
+Found 1 CUDA devices
+Device 0: NVIDIA GeForce RTX 3060
+   SMs:        28
+   Global mem: 12037 MB
+   CUDA Cap:   8.6
+---------------------------------------------------------
+Running 3 timing tests:
+Effective BW by CUDA saxpy: 20.790 ms           [10.751 GB/s]
+Kernel execution time: 0.914 ms
+Effective BW by CUDA saxpy: 20.942 ms           [10.673 GB/s]
+Kernel execution time: 0.724 ms
+Effective BW by CUDA saxpy: 20.968 ms           [10.660 GB/s]
+Kernel execution time: 0.723 ms
