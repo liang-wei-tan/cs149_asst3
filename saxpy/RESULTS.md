@@ -61,11 +61,11 @@ Device 0: NVIDIA GeForce RTX 3060
    CUDA Cap:   8.6
 ---------------------------------------------------------
 Running 3 timing tests:
-Effective BW by CUDA saxpy: 52.078 ms           [4.292 GB/s]
-Kernel execution time: 9.879 ms
-Effective BW by CUDA saxpy: 51.197 ms           [4.366 GB/s]
-Kernel execution time: 9.379 ms
-Effective BW by CUDA saxpy: 50.940 ms           [4.388 GB/s]
-Kernel execution time: 9.799 ms
+Effective BW by CUDA saxpy: 37.522 ms           [5.957 GB/s]
+Kernel execution time: 30.126 ms
+Effective BW by CUDA saxpy: 36.726 ms           [6.086 GB/s]
+Kernel execution time: 30.226 ms
+Effective BW by CUDA saxpy: 37.276 ms           [5.996 GB/s]
+Kernel execution time: 30.766 ms
 
 
