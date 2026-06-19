@@ -46,8 +46,8 @@ static inline int nextPow2(int n) {
 __global__
 void scan_upsweep_kernel(int N, int two_d, int two_dplus1, int* output){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int i = index * two_dplus1;
-    if (i + two_dplus1 - 1 < N) {
+    if (index < N / two_dplus1) {
+        int i = index * two_dplus1;
         output[i + two_dplus1 - 1] += output[i + two_d - 1];
     }
 }
@@ -55,8 +55,8 @@ void scan_upsweep_kernel(int N, int two_d, int two_dplus1, int* output){
 __global__
 void scan_downsweep_kernel(int N, int two_d, int two_dplus1, int* output){
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    int i = index * two_dplus1;
-    if (i + two_dplus1 - 1 < N) {
+    if (index < N / two_dplus1) {
+        int i = index * two_dplus1;
         int t = output[i+two_d-1];
         output[i+two_d-1] = output[i+two_dplus1-1];
         output[i+two_dplus1-1] += t;
@@ -74,20 +74,23 @@ void exclusive_scan(int* input, int N, int* result)
     // on the CPU.  Your implementation will need to make multiple calls
     // to CUDA kernel functions (that you must write) to implement the
     // scan.
-    for (int two_d = 1; two_d <= N/2; two_d*=2) {
+    int rounded_length = nextPow2(N);
+    for (int two_d = 1; two_d <= rounded_length/2; two_d*=2) {
         int two_dplus1 = 2*two_d;
-        int total_parallel_tasks = N / two_dplus1;
+        int total_parallel_tasks = rounded_length / two_dplus1;
         int blocks = (total_parallel_tasks + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-        scan_upsweep_kernel<<<blocks, THREADS_PER_BLOCK>>>(N, two_d, two_dplus1, result);
+        scan_upsweep_kernel<<<blocks, THREADS_PER_BLOCK>>>(rounded_length, two_d, two_dplus1, result);
         cudaDeviceSynchronize();
+    
     }
-    result[N-1] = 0;
+    cudaMemset(&result[rounded_length-1], 0, sizeof(int));
+    cudaDeviceSynchronize();
 
-    for (int two_d = N/2; two_d >= 1; two_d /= 2) {
+    for (int two_d = rounded_length/2; two_d >= 1; two_d /= 2) {
         int two_dplus1 = 2*two_d;
-        int total_parallel_tasks = N / two_dplus1;
+        int total_parallel_tasks = rounded_length / two_dplus1;
         int blocks = (total_parallel_tasks + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-        scan_downsweep_kernel<<<blocks, THREADS_PER_BLOCK>>>(N, two_d, two_dplus1, result);
+        scan_downsweep_kernel<<<blocks, THREADS_PER_BLOCK>>>(rounded_length, two_d, two_dplus1, result);
         cudaDeviceSynchronize();
     }
 }

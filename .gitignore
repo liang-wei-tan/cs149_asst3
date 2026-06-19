@@ -3,3 +3,4 @@ main.o
 saxpy.o
 cudaScan
 scan.o
+*/logs/*
