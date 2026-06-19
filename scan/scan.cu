@@ -42,6 +42,27 @@ static inline int nextPow2(int n) {
 // Also, as per the comments in cudaScan(), you can implement an
 // "in-place" scan, since the timing harness makes a copy of input and
 // places it in result
+
+__global__
+void scan_upsweep_kernel(int N, int two_d, int two_dplus1, int* output){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = index * two_dplus1;
+    if (i + two_dplus1 - 1 < N) {
+        output[i + two_dplus1 - 1] += output[i + two_d - 1];
+    }
+}
+
+__global__
+void scan_downsweep_kernel(int N, int two_d, int two_dplus1, int* output){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int i = index * two_dplus1;
+    if (i + two_dplus1 - 1 < N) {
+        int t = output[i+two_d-1];
+        output[i+two_d-1] = output[i+two_dplus1-1];
+        output[i+two_dplus1-1] += t;
+    }
+}
+
 void exclusive_scan(int* input, int N, int* result)
 {
 
@@ -53,8 +74,22 @@ void exclusive_scan(int* input, int N, int* result)
     // on the CPU.  Your implementation will need to make multiple calls
     // to CUDA kernel functions (that you must write) to implement the
     // scan.
+    for (int two_d = 1; two_d <= N/2; two_d*=2) {
+        int two_dplus1 = 2*two_d;
+        int total_parallel_tasks = N / two_dplus1;
+        int blocks = (total_parallel_tasks + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        scan_upsweep_kernel<<<blocks, THREADS_PER_BLOCK>>>(N, two_d, two_dplus1, result);
+        cudaDeviceSynchronize();
+    }
+    result[N-1] = 0;
 
-
+    for (int two_d = N/2; two_d >= 1; two_d /= 2) {
+        int two_dplus1 = 2*two_d;
+        int total_parallel_tasks = N / two_dplus1;
+        int blocks = (total_parallel_tasks + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        scan_downsweep_kernel<<<blocks, THREADS_PER_BLOCK>>>(N, two_d, two_dplus1, result);
+        cudaDeviceSynchronize();
+    }
 }
 
 
