@@ -185,6 +185,15 @@ double cudaScanThrust(int* inarray, int* end, int* resultarray) {
 // indices `i` for which `device_input[i] == device_input[i+1]`.
 //
 // Returns the total number of pairs found
+
+__global__
+void compare_next_kernel(int N, int* input, int* output){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index < N - 1) {
+        output[index] = (input[index] == input[index+1]) ? 1 : 0;
+    }
+}
+
 int find_repeats(int* device_input, int length, int* device_output) {
 
     // CS149 TODO:
@@ -199,7 +208,20 @@ int find_repeats(int* device_input, int length, int* device_output) {
     // must ensure that the results of find_repeats are correct given
     // the actual array length.
 
-    return 0; 
+    //1. every thread checks element n and n+1, if tthey are same write to output[n].]
+    //2. just sum up the number of 1s.
+    int total_parallel_tasks = length;
+    int blocks = (total_parallel_tasks + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    compare_next_kernel<<<blocks, THREADS_PER_BLOCK>>>(length, device_input, device_output);
+    cudaDeviceSynchronize();
+
+    exclusive_scan(device_output, length, device_output);
+    
+    int number_of_repeats;
+    int target_index = length - 1; 
+
+    cudaMemcpy(&number_of_repeats, device_output + target_index, sizeof(int), cudaMemcpyDeviceToHost);
+    return number_of_repeats; 
 }
 
 
