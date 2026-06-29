@@ -97,3 +97,50 @@ Scan Score Table:
 -------------------------------------------------------------------------
 |                                   | Total score:    | 5.0/5.0         |
 -------------------------------------------------------------------------
+
+
+
+### Comparison with reference time for find repeats
+Implemented version where I initialized another array to hold output results, then finally, copy the results to output results via a device_to_device copy
+
+
+./checker.py find_repeats
+Test: find_repeats
+
+--------------
+Running tests:
+--------------
+
+Element Count: 1000000
+Correctness passed!
+Student Time: 0.866
+Ref Time: 1.278
+
+Element Count: 10000000
+Correctness passed!
+Student Time: 5.947
+Ref Time: 8.674
+
+Element Count: 20000000
+Correctness passed!
+Student Time: 11.289
+Ref Time: 15.726
+
+Element Count: 40000000
+Correctness passed!
+Student Time: 21.953
+Ref Time: 28.822
+
+-------------------------
+Find_repeats Score Table:
+-------------------------
+-------------------------------------------------------------------------
+| Element Count   | Ref Time        | Student Time    | Score           |
+-------------------------------------------------------------------------
+| 1000000         | 1.278           | 0.866           | 1.25            |
+| 10000000        | 8.674           | 5.947           | 1.25            |
+| 20000000        | 15.726          | 11.289          | 1.25            |
+| 40000000        | 28.822          | 21.953          | 1.25            |
+-------------------------------------------------------------------------
+|                                   | Total score:    | 5.0/5.0         |
+-------------------------------------------------------------------------

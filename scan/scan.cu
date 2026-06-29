@@ -194,6 +194,16 @@ void compare_next_kernel(int N, int* input, int* output){
     }
 }
 
+__global__
+void to_index_kernel(int N, int* input, int* output){
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index < N - 1) {
+        if(input[index] != input[index + 1]){
+            output[input[index+1]-1] = index;
+        }
+    }
+}
+
 int find_repeats(int* device_input, int length, int* device_output) {
 
     // CS149 TODO:
@@ -221,6 +231,16 @@ int find_repeats(int* device_input, int length, int* device_output) {
     int target_index = length - 1; 
 
     cudaMemcpy(&number_of_repeats, device_output + target_index, sizeof(int), cudaMemcpyDeviceToHost);
+
+    int *device_indices;
+    cudaMalloc((void **)&device_indices, number_of_repeats * sizeof(int));
+    
+    to_index_kernel<<<blocks, THREADS_PER_BLOCK>>>(length, device_output, device_indices);
+    cudaDeviceSynchronize();
+
+    int bytes = number_of_repeats * sizeof(int);
+    cudaMemcpy(device_output, device_indices, bytes, cudaMemcpyDeviceToDevice);
+    cudaFree(device_indices);
     return number_of_repeats; 
 }
 
