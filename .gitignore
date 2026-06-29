@@ -4,3 +4,5 @@ saxpy.o
 cudaScan
 scan.o
 */logs/*
+/render/objs/*
+/render/render
