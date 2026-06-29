@@ -144,3 +144,18 @@ Find_repeats Score Table:
 -------------------------------------------------------------------------
 |                                   | Total score:    | 5.0/5.0         |
 -------------------------------------------------------------------------
+
+
+### Setting block size to 16
+Doing this hurts performance since it limits parallelism
+ ./cudaScan -m find_repeats -n 10000000
+---------------------------------------------------------
+Found 1 CUDA devices
+Device 0: NVIDIA GeForce RTX 3060
+   SMs:        28
+   Global mem: 11910 MB
+   CUDA Cap:   8.6
+---------------------------------------------------------
+Array size: 10000000
+Student GPU time: 10.416 ms
+Find_repeats outputs are correct!
