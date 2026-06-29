@@ -145,6 +145,50 @@ Find_repeats Score Table:
 |                                   | Total score:    | 5.0/5.0         |
 -------------------------------------------------------------------------
 
+### Reduce copy by creating a temporary array
+Results show not much difference from previous solution
+
+./checker.py find_repeats
+Test: find_repeats
+
+--------------
+Running tests:
+--------------
+
+Element Count: 1000000
+Correctness passed!
+Student Time: 0.822
+Ref Time: 1.256
+
+Element Count: 10000000
+Correctness passed!
+Student Time: 5.886
+Ref Time: 8.605
+
+Element Count: 20000000
+Correctness passed!
+Student Time: 11.329
+Ref Time: 14.871
+
+Element Count: 40000000
+Correctness passed!
+Student Time: 22.155
+Ref Time: 28.662
+
+-------------------------
+Find_repeats Score Table:
+-------------------------
+-------------------------------------------------------------------------
+| Element Count   | Ref Time        | Student Time    | Score           |
+-------------------------------------------------------------------------
+| 1000000         | 1.256           | 0.822           | 1.25            |
+| 10000000        | 8.605           | 5.886           | 1.25            |
+| 20000000        | 14.871          | 11.329          | 1.25            |
+| 40000000        | 28.662          | 22.155          | 1.25            |
+-------------------------------------------------------------------------
+|                                   | Total score:    | 5.0/5.0         |
+-------------------------------------------------------------------------
+
 
 ### Setting block size to 16
 Doing this hurts performance since it limits parallelism
@@ -159,3 +203,4 @@ Device 0: NVIDIA GeForce RTX 3060
 Array size: 10000000
 Student GPU time: 10.416 ms
 Find_repeats outputs are correct!
+

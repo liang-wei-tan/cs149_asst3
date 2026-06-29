@@ -218,29 +218,27 @@ int find_repeats(int* device_input, int length, int* device_output) {
     // must ensure that the results of find_repeats are correct given
     // the actual array length.
 
+    int *temp_output;
+    cudaMalloc((void **)&temp_output, nextPow2(length) * sizeof(int));
+
     //1. every thread checks element n and n+1, if tthey are same write to output[n].]
     //2. just sum up the number of 1s.
     int total_parallel_tasks = length;
     int blocks = (total_parallel_tasks + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    compare_next_kernel<<<blocks, THREADS_PER_BLOCK>>>(length, device_input, device_output);
+    compare_next_kernel<<<blocks, THREADS_PER_BLOCK>>>(length, device_input, temp_output);
     cudaDeviceSynchronize();
 
-    exclusive_scan(device_output, length, device_output);
-    
+    exclusive_scan(temp_output, length, temp_output);
+
     int number_of_repeats;
-    int target_index = length - 1; 
+    int target_index = length-1; 
 
-    cudaMemcpy(&number_of_repeats, device_output + target_index, sizeof(int), cudaMemcpyDeviceToHost);
-
-    int *device_indices;
-    cudaMalloc((void **)&device_indices, number_of_repeats * sizeof(int));
+    cudaMemcpy(&number_of_repeats, temp_output + target_index, sizeof(int), cudaMemcpyDeviceToHost);
     
-    to_index_kernel<<<blocks, THREADS_PER_BLOCK>>>(length, device_output, device_indices);
+    to_index_kernel<<<blocks, THREADS_PER_BLOCK>>>(length, temp_output, device_output);
     cudaDeviceSynchronize();
 
-    int bytes = number_of_repeats * sizeof(int);
-    cudaMemcpy(device_output, device_indices, bytes, cudaMemcpyDeviceToDevice);
-    cudaFree(device_indices);
+    cudaFree(temp_output);
     return number_of_repeats; 
 }
 
