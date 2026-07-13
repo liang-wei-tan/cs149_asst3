@@ -3,6 +3,20 @@
 
 #include "circleRenderer.h"
 
+struct ShadePixelParam {
+    float pixelCenterNorm_x;
+    float pixelCenterNorm_y;
+    float p_x;
+    float p_y;
+    float p_z;
+    float* imgPtr;
+};
+
+struct ShadePixelParamsForCircle{
+    ShadePixelParam* shadePixelParams;
+    int numPixels;
+};
+
 class CudaRenderer : public CircleRenderer {
  private:
   Image* image;
@@ -19,6 +33,7 @@ class CudaRenderer : public CircleRenderer {
   float* cudaDeviceColor;
   float* cudaDeviceRadius;
   float* cudaDeviceImageData;
+  ShadePixelParamsForCircle* cudaShadePixelParamsForCircleData;
 
  public:
   CudaRenderer();

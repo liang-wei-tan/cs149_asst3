@@ -6,3 +6,4 @@ scan.o
 */logs/*
 /render/objs/*
 /render/render
+*.ppm

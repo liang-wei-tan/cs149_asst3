@@ -379,12 +379,31 @@ shadePixel(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
     // END SHOULD-BE-ATOMIC REGION
 }
 
+__global__ void kernelRenderCirclesWithParams(int index, ShadePixelParamsForCircle* cudaShadePixelParamsForCircleData) {
+    if (index >= cuConstRendererParams.numCircles)
+        return;
+
+    ShadePixelParamsForCircle params = cudaShadePixelParamsForCircleData[index];
+    ShadePixelParam* shadePixelParams = params.shadePixelParams;
+    int numPixels = params.numPixels;
+
+    for (int i = 0; i < numPixels; i++) {
+        ShadePixelParam shadePixelParam = shadePixelParams[i];
+        float2 pixelCenterNorm = make_float2(shadePixelParam.pixelCenterNorm_x, shadePixelParam.pixelCenterNorm_y);
+        float3 p = make_float3(shadePixelParam.p_x, shadePixelParam.p_y, shadePixelParam.p_z);
+        float4* imgPtr = (float4*)(shadePixelParam.imgPtr);
+
+        shadePixel(index, pixelCenterNorm, p, imgPtr);
+    }
+    free(params.shadePixelParams);
+}
+
 // kernelRenderCircles -- (CUDA device code)
 //
 // Each thread renders a circle.  Since there is no protection to
 // ensure order of update or mutual exclusion on the output image, the
 // resulting image will be incorrect.
-__global__ void kernelRenderCircles() {
+__global__ void kernelRenderCircles(ShadePixelParamsForCircle* cudaShadePixelParamsForCircleData) {
 
     int index = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -416,15 +435,34 @@ __global__ void kernelRenderCircles() {
     float invHeight = 1.f / imageHeight;
 
     // for all pixels in the bonding box
+
+    ShadePixelParam* shadePixelParams = (ShadePixelParam*)malloc((screenMaxY-screenMinY) * (screenMaxX-screenMinX) * sizeof(ShadePixelParam));
+    int shadePixelParamIndex = 0;
     for (int pixelY=screenMinY; pixelY<screenMaxY; pixelY++) {
         float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * (pixelY * imageWidth + screenMinX)]);
         for (int pixelX=screenMinX; pixelX<screenMaxX; pixelX++) {
             float2 pixelCenterNorm = make_float2(invWidth * (static_cast<float>(pixelX) + 0.5f),
                                                  invHeight * (static_cast<float>(pixelY) + 0.5f));
-            shadePixel(index, pixelCenterNorm, p, imgPtr);
+            // we store the parameters for calling shadePixel(index, pixelCenterNorm, p, imgPtr);
+            // we will invoke it in the correct order later
+            ShadePixelParam shadePixelParam;
+            shadePixelParam.pixelCenterNorm_x = pixelCenterNorm.x;
+            shadePixelParam.pixelCenterNorm_y = pixelCenterNorm.y;
+            shadePixelParam.p_x = p.x;
+            shadePixelParam.p_y = p.y;
+            shadePixelParam.p_z = p.z;
+            shadePixelParam.imgPtr = (float*)imgPtr;
+
+            shadePixelParams[shadePixelParamIndex] = shadePixelParam;
+
             imgPtr++;
+            shadePixelParamIndex ++;
         }
     }
+    ShadePixelParamsForCircle params;
+    params.shadePixelParams = shadePixelParams;
+    params.numPixels = shadePixelParamIndex;
+    cudaShadePixelParamsForCircleData[index] = params;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -444,6 +482,7 @@ CudaRenderer::CudaRenderer() {
     cudaDeviceColor = NULL;
     cudaDeviceRadius = NULL;
     cudaDeviceImageData = NULL;
+    cudaShadePixelParamsForCircleData = NULL;
 }
 
 CudaRenderer::~CudaRenderer() {
@@ -465,6 +504,7 @@ CudaRenderer::~CudaRenderer() {
         cudaFree(cudaDeviceColor);
         cudaFree(cudaDeviceRadius);
         cudaFree(cudaDeviceImageData);
+        cudaFree(cudaShadePixelParamsForCircleData);
     }
 }
 
@@ -492,7 +532,7 @@ CudaRenderer::loadScene(SceneName scene, int seed) {
 
 void
 CudaRenderer::setup() {
-
+    cudaDeviceSetLimit(cudaLimitMallocHeapSize, 256 * 1024 * 1024);
     int deviceCount = 0;
     std::string name;
     cudaError_t err = cudaGetDeviceCount(&deviceCount);
@@ -525,6 +565,7 @@ CudaRenderer::setup() {
     cudaMalloc(&cudaDeviceColor, sizeof(float) * 3 * numCircles);
     cudaMalloc(&cudaDeviceRadius, sizeof(float) * numCircles);
     cudaMalloc(&cudaDeviceImageData, sizeof(float) * 4 * image->width * image->height);
+    cudaMalloc(&cudaShadePixelParamsForCircleData, sizeof(ShadePixelParamsForCircle) * numCircles);
 
     cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaDeviceVelocity, velocity, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
@@ -640,6 +681,16 @@ CudaRenderer::render() {
     dim3 blockDim(256, 1);
     dim3 gridDim((numCircles + blockDim.x - 1) / blockDim.x);
 
-    kernelRenderCircles<<<gridDim, blockDim>>>();
+    kernelRenderCircles<<<gridDim, blockDim>>>(cudaShadePixelParamsForCircleData);
     cudaDeviceSynchronize();
+
+    for(int i = 0; i < numCircles; i++) {
+        kernelRenderCirclesWithParams<<<1, 1>>>(i, cudaShadePixelParamsForCircleData);
+        cudaError_t err = cudaDeviceSynchronize();
+if (err != cudaSuccess) {
+    printf("CUDA Error: %s\n", cudaGetErrorString(err)); // This will print "illegal memory access"
+}
+    }
+
+
 }
