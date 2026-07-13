@@ -414,3 +414,29 @@ Please submit your work using Gradescope. If you are working with a partner plea
 2. **Please submit run `sh create_submission.sh` to generate a zip to submit to gradescope.** Note that this will run make clean in your code directories so you will have to run make again to run your code. If the script errors saying 'Permission denied', you should run `chmod +x create\_submission.sh` and then try rerunning the script.
 
 Our grading scripts will rerun the checker code allowing us to verify your score matches what you submitted in the `writeup.pdf`. We might also try to run your code on other datasets to further examine its correctness.
+
+## Debugging notes
+To resolve 
+```
+mkdir -p objs/
+
+g++ -m64 main.cpp -O3 -Wall -g -c -o objs/main.o
+
+In file included from main.cpp:8:
+
+platformgl.h:7:10: fatal error: GL/glut.h: No such file or directory
+
+    7 | #include <GL/glut.h>
+
+      |          ^~~~~~~~~~~
+
+compilation terminated.
+
+make: *** [Makefile:67: objs/main.o] Error 1 
+```
+Run the following
+
+```
+sudo apt update
+sudo apt install freeglut3-dev
+```
