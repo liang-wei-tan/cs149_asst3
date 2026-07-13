@@ -440,6 +440,3 @@ Run the following
 sudo apt update
 sudo apt install freeglut3-dev
 ```
-
-### Naive way which runs 1 at a time using CUDA
-passes but not the intended solutions. Takes forever to run. No parallelism at all.

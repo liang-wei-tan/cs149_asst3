@@ -3,6 +3,13 @@
 
 #include "circleRenderer.h"
 
+struct CircleParams {
+    short screenMinX;
+    short screenMaxX;
+    short screenMinY;
+    short screenMaxY;
+};
+
 class CudaRenderer : public CircleRenderer {
  private:
   Image* image;
@@ -13,12 +20,14 @@ class CudaRenderer : public CircleRenderer {
   float* velocity;
   float* color;
   float* radius;
+  CircleParams* circleParams;
 
   float* cudaDevicePosition;
   float* cudaDeviceVelocity;
   float* cudaDeviceColor;
   float* cudaDeviceRadius;
   float* cudaDeviceImageData;
+  CircleParams* cudaDeviceCircleParams;
 
  public:
   CudaRenderer();

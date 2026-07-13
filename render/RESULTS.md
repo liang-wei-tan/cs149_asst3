@@ -30,3 +30,47 @@ When running
 
  i get this error
  CUDA Error: an illegal memory access was encountered
+
+
+### Iteration 2: Naive way which runs 1 at a time using CUDA
+passes but not the intended solutions. Takes forever to run. No parallelism at all.
+
+### Iteration 3: Parallelizing at pixel level. 
+Implementaiton is correct but unsure if there is regression due to too many threads/pixels.
+Still not fully parallelizing due to processing circle 1 at a time. 
+
+./checker.py 
+
+Running scene: rgb...
+[rgb] Correctness passed!
+[rgb] Student times:  [0.2345, 0.2459, 0.2412]
+[rgb] Reference times:  [0.1932, 0.1999, 0.1951]
+
+Running scene: rand10k...
+[rand10k] Correctness passed!
+[rand10k] Student times:  [84.8095, 85.9897, 86.0491]
+[rand10k] Reference times:  [3.0072, 3.0127, 3.0081]
+
+Running scene: rand100k...
+[rand100k] Correctness passed!
+[rand100k] Student times:  [848.7297, 855.5512, 855.3382]
+[rand100k] Reference times:  [28.8694, 26.7312, 26.663]
+
+Running scene: pattern...
+[pattern] Correctness passed!
+[pattern] Student times:  [5.0272, 5.0571, 4.9631]
+[pattern] Reference times:  [0.3724, 0.3808, 0.3778]
+
+Running scene: snowsingle...
+[snowsingle] Correctness passed!
+[snowsingle] Student times:  [220.0828, 222.3333, 218.7204]
+[snowsingle] Reference times:  [18.559, 18.5684, 18.5549]
+
+Running scene: biglittle...
+[biglittle] Correctness passed!
+[biglittle] Student times:  [218.105, 219.0696, 217.8286]
+[biglittle] Reference times:  [15.328, 15.3384, 15.3449]
+
+Running scene: rand1M...
+[rand1M] Correctness passed!
+... takes forever. 
