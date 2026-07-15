@@ -379,12 +379,10 @@ shadePixel(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
     // END SHOULD-BE-ATOMIC REGION
 }
 
-// kernelRenderCircles -- (CUDA device code)
+// kernelRenderCircleBoundingRectangles -- (CUDA device code)
 //
-// Each thread renders a circle.  Since there is no protection to
-// ensure order of update or mutual exclusion on the output image, the
-// resulting image will be incorrect.
-__global__ void kernelRenderCircles(CircleParams* cudaDeviceCircleParams) {
+// Render bounding rectangle of each circle
+__global__ void kernelRenderCircleBoundingRectangles(CircleParams* cudaDeviceCircleParams) {
 
     int index = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -412,8 +410,6 @@ __global__ void kernelRenderCircles(CircleParams* cudaDeviceCircleParams) {
     short screenMinY = (minY > 0) ? ((minY < imageHeight) ? minY : imageHeight) : 0;
     short screenMaxY = (maxY > 0) ? ((maxY < imageHeight) ? maxY : imageHeight) : 0;
 
-    // float invWidth = 1.f / imageWidth;
-    // float invHeight = 1.f / imageHeight;
 
     // for all pixels in the bonding box
     CircleParams circleParams;
@@ -422,18 +418,6 @@ __global__ void kernelRenderCircles(CircleParams* cudaDeviceCircleParams) {
     circleParams.screenMinY = screenMinY;
     circleParams.screenMaxY = screenMaxY;
     cudaDeviceCircleParams[index] = circleParams;
-
-
-    
-    // for (int pixelY=screenMinY; pixelY<screenMaxY; pixelY++) {
-    //     float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * (pixelY * imageWidth + screenMinX)]);
-    //     for (int pixelX=screenMinX; pixelX<screenMaxX; pixelX++) {
-    //         float2 pixelCenterNorm = make_float2(invWidth * (static_cast<float>(pixelX) + 0.5f),
-    //                                              invHeight * (static_cast<float>(pixelY) + 0.5f));
-    //         shadePixel(index, pixelCenterNorm, p, imgPtr);
-    //         imgPtr++;
-    //     }
-    // }
 }
 
 __global__ void kernelRenderCircles2(int index, CircleParams* cudaDeviceCircleParams) {
@@ -485,6 +469,7 @@ CudaRenderer::CudaRenderer() {
     cudaDeviceRadius = NULL;
     cudaDeviceImageData = NULL;
     cudaDeviceCircleParams = NULL;
+    cudaLatestDepdency = NULL;
 }
 
 CudaRenderer::~CudaRenderer() {
@@ -508,6 +493,7 @@ CudaRenderer::~CudaRenderer() {
         cudaFree(cudaDeviceRadius);
         cudaFree(cudaDeviceImageData);
         cudaFree(cudaDeviceCircleParams);
+        cudaFree(&cudaLatestDepdency);
     }
 }
 
@@ -571,6 +557,7 @@ CudaRenderer::setup() {
     cudaMalloc(&cudaDeviceRadius, sizeof(float) * numCircles);
     cudaMalloc(&cudaDeviceImageData, sizeof(float) * 4 * image->width * image->height);
     cudaMalloc(&cudaDeviceCircleParams, sizeof(CircleParams) * numCircles);
+    cudaMalloc(&cudaLatestDepdency, sizeof(int) * numCircles);
 
     cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaDeviceVelocity, velocity, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
@@ -686,10 +673,10 @@ CudaRenderer::render() {
     dim3 blockDim(256, 1);
     dim3 gridDim((numCircles + blockDim.x - 1) / blockDim.x);
 
-    kernelRenderCircles<<<gridDim, blockDim>>>(cudaDeviceCircleParams);
-   cudaError_t err = cudaDeviceSynchronize();
+    kernelRenderCircleBoundingRectangles<<<gridDim, blockDim>>>(cudaDeviceCircleParams);
+    cudaError_t err = cudaDeviceSynchronize();
     if (err != cudaSuccess) {
-        printf("GPU CRASHED in kernelRenderCircles: %s\n", cudaGetErrorString(err));
+        printf("GPU CRASHED in kernelRenderCircleBoundingRectangles: %s\n", cudaGetErrorString(err));
     }
 
     cudaMemcpy(circleParams, cudaDeviceCircleParams, sizeof(CircleParams) * numCircles, cudaMemcpyDeviceToHost);
