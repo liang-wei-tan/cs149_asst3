@@ -82,6 +82,71 @@ __global__ void kernelClearImageSnowflake() {
     *(float4*)(&cuConstRendererParams.imageData[offset]) = value;
 }
 
+
+// circleInBoxConservative --
+//
+// Tests whether circle with center (circleX, circleY) and radius
+// `circleRadius` *may intersect* the box defined by coordinates for
+// it's left and right sides, and top and bottom edges.  For
+// efficiency, this is a conservative test.  If it returns 0, then the
+// circle definitely does not intersect the box.  However a result of
+// 1 does not imply an intersection actually exists.  Further tests
+// are needed to determine if an intersection actually exists.  For
+// example, you could continue with actual point in circle tests, or
+// make a subsequent call to circleInBox().
+// Note: For a valid Box, you will want to use boxR >= boxL and 
+// boxT >= boxB. 
+__device__ __inline__ int
+circleInBoxConservative(
+    float circleX, float circleY, float circleRadius,
+    float boxL, float boxR, float boxT, float boxB)
+{
+
+    // expand box by circle radius.  Test if circle center is in the
+    // expanded box.
+
+    if ( circleX >= (boxL - circleRadius) &&
+         circleX <= (boxR + circleRadius) &&
+         circleY >= (boxB - circleRadius) &&
+         circleY <= (boxT + circleRadius) ) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+
+// circleInBox --
+//
+// This is a true circle in box test.  It is more expensive than the
+// function circleInBoxConservative above, but it's 1/0 result is a
+// definitive result.
+// Note: For a valid Box, you will want to use boxR >= boxL and 
+// boxT >= boxB. 
+__device__ __inline__ int
+circleInBox(
+    float circleX, float circleY, float circleRadius,
+    float boxL, float boxR, float boxT, float boxB)
+{
+
+    // clamp circle center to box (finds the closest point on the box)
+    float closestX = (circleX > boxL) ? ((circleX < boxR) ? circleX : boxR) : boxL;
+    float closestY = (circleY > boxB) ? ((circleY < boxT) ? circleY : boxT) : boxB;
+
+    // is circle radius less than the distance to the closest point on
+    // the box?
+    float distX = closestX - circleX;
+    float distY = closestY - circleY;
+
+    if ( ((distX*distX) + (distY*distY)) <= (circleRadius*circleRadius) ) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+
+
 // kernelClearImage --  (CUDA device code)
 //
 // Clear the image, setting all pixels to the specified color rgba
@@ -420,34 +485,73 @@ __global__ void kernelRenderCircleBoundingRectangles(CircleParams* cudaDeviceCir
     cudaDeviceCircleParams[index] = circleParams;
 }
 
-__global__ void kernelRenderCircles2(int index, CircleParams* cudaDeviceCircleParams) {
+__global__ void kernelComputeDependency(CircleParams* cudaDeviceCircleParams, int* cudaLatestDependency) {
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index >= cuConstRendererParams.numCircles)
+        return;
+    cudaLatestDependency[index] = -1;
+    int index3 = 3 * index;
+    float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
+    float rad = cuConstRendererParams.radius[index];
+    for(int i = index - 1; i >= 0; i--){
+        CircleParams circleForCompare = cudaDeviceCircleParams[i];
+        int results = circleInBoxConservative(p.x, p.y, rad, circleForCompare.screenMinX, circleForCompare.screenMaxX, circleForCompare.screenMaxY, circleForCompare.screenMinY);
+        if(results == 1){
+            printf("came in \n");
+            results = circleInBox(p.x, p.y, rad, circleForCompare.screenMinX, circleForCompare.screenMaxX, circleForCompare.screenMaxY, circleForCompare.screenMinY);
+            if(results == 1){
+                printf("came in 2\n");
+                cudaLatestDependency[index] = i;
+                break;
+            }
+        }
+
+    }
+
+}
+
+__global__ void kernelRenderCircles(CircleParams* cudaDeviceCircleParams, int* cudaLatestDependency, bool* cudaCircleProcessingComplete) {
+    int index = blockIdx.x;
+    if (index >= cuConstRendererParams.numCircles) {
+        return; 
+    }
+
+    bool toProcess = false;
+    int dependency = cudaLatestDependency[index];
+    if(dependency == -1){
+        toProcess = true;
+    }else if(cudaCircleProcessingComplete[dependency]){
+        toProcess = true;
+    }
+
+    if(!toProcess){
+        return;
+    }
+
+    int threadIndex = threadIdx.x;
     CircleParams circleParams = cudaDeviceCircleParams[index];
-    int coordinateIndex = blockIdx.x * blockDim.x + threadIdx.x;
     int screenMaxX =  static_cast<int>(circleParams.screenMaxX);
     int screenMinX = static_cast<int>(circleParams.screenMinX);
     int screenMaxY = static_cast<int>(circleParams.screenMaxY);
     int screenMinY = static_cast<int>(circleParams.screenMinY);
-    short pixelY = static_cast<short>(coordinateIndex / (screenMaxX - screenMinX) + screenMinY);
-    short pixelX = static_cast<short>(coordinateIndex % (screenMaxX - screenMinX) + screenMinX);
-
-
-    int numTasks = (screenMaxY - screenMinY) * (screenMaxX - screenMinX);
-    if (coordinateIndex >= numTasks) {
-        return; 
-    }
 
     int index3 = 3 * index;
     float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
     short imageWidth = cuConstRendererParams.imageWidth;
     short imageHeight = cuConstRendererParams.imageHeight;
-    // short screenMinX = circleParams.screenMinX;
     float invWidth = 1.f / imageWidth;
     float invHeight = 1.f / imageHeight;
-    float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * (pixelY * imageWidth + screenMinX)]);
-    imgPtr += (pixelX - screenMinX);
-    float2 pixelCenterNorm = make_float2(invWidth * (static_cast<float>(pixelX) + 0.5f), invHeight * (static_cast<float>(pixelY) + 0.5f));
-    shadePixel(index, pixelCenterNorm, p, imgPtr);
-
+    
+    int numTasks = (screenMaxY - screenMinY) * (screenMaxX - screenMinX);
+    for (int i = threadIndex; i < numTasks ; i+=blockDim.x){
+        short pixelY = static_cast<short>(i / (screenMaxX - screenMinX) + screenMinY);
+        short pixelX = static_cast<short>(i % (screenMaxX - screenMinX) + screenMinX);
+        float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * (pixelY * imageWidth + screenMinX)]);
+        imgPtr += (pixelX - screenMinX);
+        float2 pixelCenterNorm = make_float2(invWidth * (static_cast<float>(pixelX) + 0.5f), invHeight * (static_cast<float>(pixelY) + 0.5f));
+        shadePixel(index, pixelCenterNorm, p, imgPtr);
+    }
+    cudaCircleProcessingComplete[index] = true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -462,6 +566,7 @@ CudaRenderer::CudaRenderer() {
     color = NULL;
     radius = NULL;
     circleParams = NULL;
+    circleProcessingComplete = NULL;
 
     cudaDevicePosition = NULL;
     cudaDeviceVelocity = NULL;
@@ -469,7 +574,8 @@ CudaRenderer::CudaRenderer() {
     cudaDeviceRadius = NULL;
     cudaDeviceImageData = NULL;
     cudaDeviceCircleParams = NULL;
-    cudaLatestDepdency = NULL;
+    cudaLatestDependency = NULL;
+    cudaCircleProcessingComplete = NULL;
 }
 
 CudaRenderer::~CudaRenderer() {
@@ -484,6 +590,7 @@ CudaRenderer::~CudaRenderer() {
         delete [] color;
         delete [] radius;
         delete[] circleParams;
+        delete[] circleProcessingComplete;
     }
 
     if (cudaDevicePosition) {
@@ -493,7 +600,8 @@ CudaRenderer::~CudaRenderer() {
         cudaFree(cudaDeviceRadius);
         cudaFree(cudaDeviceImageData);
         cudaFree(cudaDeviceCircleParams);
-        cudaFree(&cudaLatestDepdency);
+        cudaFree(cudaLatestDependency);
+        cudaFree(cudaCircleProcessingComplete);
     }
 }
 
@@ -550,6 +658,7 @@ CudaRenderer::setup() {
     // cudaMalloc and cudaMemcpy
 
     circleParams = new CircleParams[numCircles];
+    circleProcessingComplete = new bool[numCircles];
 
     cudaMalloc(&cudaDevicePosition, sizeof(float) * 3 * numCircles);
     cudaMalloc(&cudaDeviceVelocity, sizeof(float) * 3 * numCircles);
@@ -557,12 +666,15 @@ CudaRenderer::setup() {
     cudaMalloc(&cudaDeviceRadius, sizeof(float) * numCircles);
     cudaMalloc(&cudaDeviceImageData, sizeof(float) * 4 * image->width * image->height);
     cudaMalloc(&cudaDeviceCircleParams, sizeof(CircleParams) * numCircles);
-    cudaMalloc(&cudaLatestDepdency, sizeof(int) * numCircles);
+    cudaMalloc(&cudaLatestDependency, sizeof(int) * numCircles);
+    cudaMalloc(&cudaCircleProcessingComplete, sizeof(bool) * numCircles);
+
 
     cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaDeviceVelocity, velocity, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaDeviceRadius, radius, sizeof(float) * numCircles, cudaMemcpyHostToDevice);
+    cudaMemset(cudaCircleProcessingComplete, false, sizeof(bool) * numCircles);
 
     // Initialize parameters in constant memory.  We didn't talk about
     // constant memory in class, but the use of read-only constant
@@ -679,19 +791,37 @@ CudaRenderer::render() {
         printf("GPU CRASHED in kernelRenderCircleBoundingRectangles: %s\n", cudaGetErrorString(err));
     }
 
-    cudaMemcpy(circleParams, cudaDeviceCircleParams, sizeof(CircleParams) * numCircles, cudaMemcpyDeviceToHost);
-    for(int i = 0; i < numCircles; i++) {
-        CircleParams circleParam = circleParams[i];
-        int numTasks = (circleParam.screenMaxY - circleParam.screenMinY) * (circleParam.screenMaxX - circleParam.screenMinX);
-        dim3 blockDim2(256, 1);
-        dim3 gridDim2((numTasks + blockDim2.x - 1) / blockDim2.x);
-        kernelRenderCircles2<<<gridDim2, blockDim2>>>(i, cudaDeviceCircleParams);
- cudaError_t err = cudaDeviceSynchronize();
+    kernelComputeDependency<<<gridDim, blockDim>>>(cudaDeviceCircleParams, cudaLatestDependency);
+    err = cudaDeviceSynchronize();
     if (err != cudaSuccess) {
-        printf("GPU CRASHED in kernelRenderCircles2: %s\n", cudaGetErrorString(err));
+        printf("GPU CRASHED in kernelComputeDependency: %s\n", cudaGetErrorString(err));
+    }
+    int* test = new int[numCircles];
+    cudaMemcpy(test, cudaLatestDependency, sizeof(int) * numCircles, cudaMemcpyDeviceToHost);
+    for(int i = 0; i<numCircles; i++){
+        printf("depdency of %d is %d  \n", i, test[i]);
     }
 
-// int index, int pixelY, int pixelX, CircleParams* cudaDeviceCircleParams) {
+    dim3 blockDim2(256, 1);
+    dim3 gridDim2(numCircles);
+    bool toContinue = true;
+    while(toContinue){
+        kernelRenderCircles<<<gridDim2, blockDim2>>>(cudaDeviceCircleParams, cudaLatestDependency, cudaCircleProcessingComplete);
+        err = cudaDeviceSynchronize();
+        if (err != cudaSuccess) {
+            printf("GPU CRASHED in kernelRenderCircles: %s\n", cudaGetErrorString(err));
+        }
+        cudaMemcpy(circleProcessingComplete, cudaCircleProcessingComplete, sizeof(bool) * numCircles, cudaMemcpyDeviceToHost);
+        bool allProcessed = true;
+        for(int i = 0; i < numCircles; i++){
+            if(circleProcessingComplete[i] == false){
+                allProcessed = false;
+                break;
+            }
+        }
+        if(allProcessed){
+            toContinue = false;
+        }
     }
 
 }

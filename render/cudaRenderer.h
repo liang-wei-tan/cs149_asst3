@@ -21,6 +21,7 @@ class CudaRenderer : public CircleRenderer {
   float* color;
   float* radius;
   CircleParams* circleParams;
+  bool* circleProcessingComplete;
 
   float* cudaDevicePosition;
   float* cudaDeviceVelocity;
@@ -29,6 +30,7 @@ class CudaRenderer : public CircleRenderer {
   float* cudaDeviceImageData;
   CircleParams* cudaDeviceCircleParams;
   int* cudaLatestDependency;
+  bool* cudaCircleProcessingComplete;
 
  public:
   CudaRenderer();
