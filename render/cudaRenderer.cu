@@ -492,15 +492,21 @@ __global__ void kernelComputeDependency(CircleParams* cudaDeviceCircleParams, in
     cudaLatestDependency[index] = -1;
     int index3 = 3 * index;
     float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
+    float invWidth = 1.0f / cuConstRendererParams.imageWidth;
+    float invHeight = 1.0f / cuConstRendererParams.imageHeight;
     float rad = cuConstRendererParams.radius[index];
     for(int i = index - 1; i >= 0; i--){
         CircleParams circleForCompare = cudaDeviceCircleParams[i];
-        int results = circleInBoxConservative(p.x, p.y, rad, circleForCompare.screenMinX, circleForCompare.screenMaxX, circleForCompare.screenMaxY, circleForCompare.screenMinY);
+        float boxL = circleForCompare.screenMinX * invWidth;
+        float boxR = circleForCompare.screenMaxX * invWidth;
+        float boxB = circleForCompare.screenMinY * invHeight;
+        float boxT = circleForCompare.screenMaxY * invHeight;
+        int results = circleInBoxConservative(p.x, p.y, rad, boxL, boxR, boxT, boxB);
         if(results == 1){
-            printf("came in \n");
-            results = circleInBox(p.x, p.y, rad, circleForCompare.screenMinX, circleForCompare.screenMaxX, circleForCompare.screenMaxY, circleForCompare.screenMinY);
+            // printf("came in \n");
+            results = circleInBox(p.x, p.y, rad, boxL, boxR, boxT, boxB);
             if(results == 1){
-                printf("came in 2\n");
+                // printf("came in 2\n");
                 cudaLatestDependency[index] = i;
                 break;
             }
@@ -514,6 +520,9 @@ __global__ void kernelRenderCircles(CircleParams* cudaDeviceCircleParams, int* c
     int index = blockIdx.x;
     if (index >= cuConstRendererParams.numCircles) {
         return; 
+    }
+    if(cudaCircleProcessingComplete[index]){
+        return;
     }
 
     bool toProcess = false;
@@ -796,11 +805,11 @@ CudaRenderer::render() {
     if (err != cudaSuccess) {
         printf("GPU CRASHED in kernelComputeDependency: %s\n", cudaGetErrorString(err));
     }
-    int* test = new int[numCircles];
-    cudaMemcpy(test, cudaLatestDependency, sizeof(int) * numCircles, cudaMemcpyDeviceToHost);
-    for(int i = 0; i<numCircles; i++){
-        printf("depdency of %d is %d  \n", i, test[i]);
-    }
+    // int* test = new int[numCircles];
+    // cudaMemcpy(test, cudaLatestDependency, sizeof(int) * numCircles, cudaMemcpyDeviceToHost);
+    // for(int i = 0; i<numCircles; i++){
+    //     printf("depdency of %d is %d  \n", i, test[i]);
+    // }
 
     dim3 blockDim2(256, 1);
     dim3 gridDim2(numCircles);
