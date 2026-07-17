@@ -146,3 +146,37 @@ Score table:
 --------------------------------------------------------------------------
 |                                    | Total score:    | 9/72            |
 --------------------------------------------------------------------------
+
+### Iteration 5: change back to dynamically computing dependency before any exeuction. 
+Correct now but very slow. Perhaps iterating through all circles dymaically to check for depndency is too slow. Also copying a large array back to device to check completeness is also quite slow. 
+./checker.py 
+
+Running scene: rgb...
+[rgb] Correctness passed!
+[rgb] Student times:  [0.366, 0.3717, 0.3782]
+[rgb] Reference times:  [0.0913, 0.104, 0.0987]
+
+Running scene: rand10k...
+[rand10k] Correctness passed!
+[rand10k] Student times:  [44.368, 44.3907, 44.3914]
+[rand10k] Reference times:  [0.9462, 0.9404, 0.9469]
+
+Running scene: rand100k...
+[rand100k] Correctness passed!
+[rand100k] Student times:  [3903.6096, 3907.3975, 3904.9482]
+[rand100k] Reference times:  [8.6073, 8.613, 8.6103]
+
+Running scene: pattern...
+[pattern] Correctness passed!
+[pattern] Student times:  [0.6635, 0.6814, 0.6637]
+[pattern] Reference times:  [0.1536, 0.1563, 0.1583]
+
+Running scene: snowsingle...
+[snowsingle] Correctness passed!
+[snowsingle] Student times:  [441.5667, 442.5308, 441.5508]
+[snowsingle] Reference times:  [5.5429, 5.543, 5.538]
+
+Running scene: biglittle...
+[biglittle] Correctness passed!
+[biglittle] Student times:  [676.0049, 676.1458, 676.0125]
+[biglittle] Reference times:  [4.9781, 4.9662, 4.9594]

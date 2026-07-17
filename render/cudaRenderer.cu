@@ -524,18 +524,52 @@ __global__ void kernelRenderCircles(CircleParams* cudaDeviceCircleParams, int* c
     if(cudaCircleProcessingComplete[index]){
         return;
     }
+    
+    CircleParams myParams = cudaDeviceCircleParams[index];
+    int index3 = 3 * index;
+    float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
+    float rad = cuConstRendererParams.radius[index];
 
-    bool toProcess = false;
-    int dependency = cudaLatestDependency[index];
-    if(dependency == -1){
-        toProcess = true;
-    }else if(cudaCircleProcessingComplete[dependency]){
-        toProcess = true;
+    float invWidth = 1.0f / cuConstRendererParams.imageWidth;
+    float invHeight = 1.0f / cuConstRendererParams.imageHeight;
+    bool safeToDraw = true;
+    for (int i = index - 1; i >= 0; i--) {
+        // If an earlier circle isn't done yet...
+        if (!cudaCircleProcessingComplete[i]) {
+            CircleParams otherParams = cudaDeviceCircleParams[i];
+            
+            float boxL = otherParams.screenMinX * invWidth;
+            float boxR = otherParams.screenMaxX * invWidth;
+            float boxB = otherParams.screenMinY * invHeight;
+            float boxT = otherParams.screenMaxY * invHeight;
+
+            // Check if they might overlap
+            if (circleInBoxConservative(p.x, p.y, rad, boxL, boxR, boxT, boxB)) {
+                if (circleInBox(p.x, p.y, rad, boxL, boxR, boxT, boxB)) {
+                    // We overlap an unfinished circle! We must abort and try again later.
+                    safeToDraw = false;
+                    break;
+                }
+            }
+        }
     }
 
-    if(!toProcess){
+    if (!safeToDraw) {
         return;
     }
+
+
+    // bool toProcess = false;
+    // int dependency = cudaLatestDependency[index];
+    // if(dependency == -1){
+    //     toProcess = true;
+    // }else if(cudaCircleProcessingComplete[dependency]){
+    //     toProcess = true;
+    // }
+
+    // if(!toProcess){
+    //     return;
+    // }
 
     int threadIndex = threadIdx.x;
     CircleParams circleParams = cudaDeviceCircleParams[index];
@@ -544,12 +578,11 @@ __global__ void kernelRenderCircles(CircleParams* cudaDeviceCircleParams, int* c
     int screenMaxY = static_cast<int>(circleParams.screenMaxY);
     int screenMinY = static_cast<int>(circleParams.screenMinY);
 
-    int index3 = 3 * index;
-    float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
+    // int index3 = 3 * index;
     short imageWidth = cuConstRendererParams.imageWidth;
     short imageHeight = cuConstRendererParams.imageHeight;
-    float invWidth = 1.f / imageWidth;
-    float invHeight = 1.f / imageHeight;
+    // float invWidth = 1.f / imageWidth;
+    // float invHeight = 1.f / imageHeight;
     
     int numTasks = (screenMaxY - screenMinY) * (screenMaxX - screenMinX);
     for (int i = threadIndex; i < numTasks ; i+=blockDim.x){
@@ -560,7 +593,12 @@ __global__ void kernelRenderCircles(CircleParams* cudaDeviceCircleParams, int* c
         float2 pixelCenterNorm = make_float2(invWidth * (static_cast<float>(pixelX) + 0.5f), invHeight * (static_cast<float>(pixelY) + 0.5f));
         shadePixel(index, pixelCenterNorm, p, imgPtr);
     }
-    cudaCircleProcessingComplete[index] = true;
+    __syncthreads(); 
+
+    // Only one thread needs to mark it complete
+    if (threadIdx.x == 0) {
+        cudaCircleProcessingComplete[index] = true;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -800,15 +838,10 @@ CudaRenderer::render() {
         printf("GPU CRASHED in kernelRenderCircleBoundingRectangles: %s\n", cudaGetErrorString(err));
     }
 
-    kernelComputeDependency<<<gridDim, blockDim>>>(cudaDeviceCircleParams, cudaLatestDependency);
-    err = cudaDeviceSynchronize();
-    if (err != cudaSuccess) {
-        printf("GPU CRASHED in kernelComputeDependency: %s\n", cudaGetErrorString(err));
-    }
-    // int* test = new int[numCircles];
-    // cudaMemcpy(test, cudaLatestDependency, sizeof(int) * numCircles, cudaMemcpyDeviceToHost);
-    // for(int i = 0; i<numCircles; i++){
-    //     printf("depdency of %d is %d  \n", i, test[i]);
+    // kernelComputeDependency<<<gridDim, blockDim>>>(cudaDeviceCircleParams, cudaLatestDependency);
+    // err = cudaDeviceSynchronize();
+    // if (err != cudaSuccess) {
+    //     printf("GPU CRASHED in kernelComputeDependency: %s\n", cudaGetErrorString(err));
     // }
 
     dim3 blockDim2(256, 1);
