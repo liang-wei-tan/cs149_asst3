@@ -31,6 +31,7 @@ class CudaRenderer : public CircleRenderer {
   CircleParams* cudaDeviceCircleParams;
   int* cudaLatestDependency;
   bool* cudaCircleProcessingComplete;
+  int* cudaCirclesCompleted;
 
  public:
   CudaRenderer();

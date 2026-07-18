@@ -518,13 +518,12 @@ __global__ void kernelComputeDependency(CircleParams* cudaDeviceCircleParams, in
 
 }
 
-__global__ void kernelRenderCircles(CircleParams* cudaDeviceCircleParams, int* cudaLatestDependency, bool* cudaCircleProcessingComplete) {
+__global__ void kernelRenderCircles(CircleParams* cudaDeviceCircleParams, int* cudaLatestDependency, bool* cudaCircleProcessingComplete, int* cudaCirclesCompleted) {
     int index = blockIdx.x;
     if (index >= cuConstRendererParams.numCircles) {
         return; 
     }
     bool completed = cudaCircleProcessingComplete[index];
-    __syncthreads(); 
     if(completed){
         return;
     }
@@ -624,6 +623,7 @@ __global__ void kernelRenderCircles(CircleParams* cudaDeviceCircleParams, int* c
     // Only one thread needs to mark it complete
     if (threadIdx.x == 0) {
         cudaCircleProcessingComplete[index] = true;
+        atomicAdd(cudaCirclesCompleted, 1);
     }
 }
 
@@ -675,6 +675,7 @@ CudaRenderer::~CudaRenderer() {
         cudaFree(cudaDeviceCircleParams);
         cudaFree(cudaLatestDependency);
         cudaFree(cudaCircleProcessingComplete);
+        cudaFree(cudaCirclesCompleted);
     }
 }
 
@@ -741,6 +742,7 @@ CudaRenderer::setup() {
     cudaMalloc(&cudaDeviceCircleParams, sizeof(CircleParams) * numCircles);
     cudaMalloc(&cudaLatestDependency, sizeof(int) * numCircles);
     cudaMalloc(&cudaCircleProcessingComplete, sizeof(bool) * numCircles);
+    cudaMalloc(&cudaCirclesCompleted, sizeof(int));
 
 
     cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
@@ -889,11 +891,12 @@ CudaRenderer::render() {
     dim3 gridDim2(numCircles);
     bool toContinue = true;
     int iteration = 0;
+    int hostCirclesCompleted = 0;
     while(toContinue){
         // printf("Iteration: %d \n", iteration);
         
         auto startTime = std::chrono::high_resolution_clock::now();
-        kernelRenderCircles<<<gridDim2, blockDim2>>>(cudaDeviceCircleParams, cudaLatestDependency, cudaCircleProcessingComplete);
+        kernelRenderCircles<<<gridDim2, blockDim2>>>(cudaDeviceCircleParams, cudaLatestDependency, cudaCircleProcessingComplete, cudaCirclesCompleted);
 
         err = cudaDeviceSynchronize();
         if (err != cudaSuccess) {
@@ -905,15 +908,9 @@ CudaRenderer::render() {
         // printf("Total kernelRenderCircles time: %f ms\n", duration.count());
         
         auto startTimeForMemCpy = std::chrono::high_resolution_clock::now();
-        cudaMemcpy(circleProcessingComplete, cudaCircleProcessingComplete, sizeof(bool) * numCircles, cudaMemcpyDeviceToHost);
-        bool allProcessed = true;
-        for(int i = 0; i < numCircles; i++){
-            if(circleProcessingComplete[i] == false){
-                allProcessed = false;
-                break;
-            }
-        }
-        if(allProcessed){
+        // cudaMemcpy(circleProcessingComplete, cudaCircleProcessingComplete, sizeof(bool) * numCircles, cudaMemcpyDeviceToHost);
+        cudaMemcpy(&hostCirclesCompleted, cudaCirclesCompleted, sizeof(int), cudaMemcpyDeviceToHost);
+        if(hostCirclesCompleted == numCircles){
             toContinue = false;
         }
         // auto stopTimeForMemCpy = std::chrono::high_resolution_clock::now();
