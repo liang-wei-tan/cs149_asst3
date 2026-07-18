@@ -7,3 +7,5 @@ scan.o
 /render/objs/*
 /render/render
 *.ppm
+*.nsys-rep
+*.sqlite

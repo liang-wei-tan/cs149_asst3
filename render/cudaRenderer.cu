@@ -7,6 +7,7 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <driver_functions.h>
+#include <chrono>
 
 #include "cudaRenderer.h"
 #include "image.h"
@@ -447,13 +448,14 @@ shadePixel(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
 // kernelRenderCircleBoundingRectangles -- (CUDA device code)
 //
 // Render bounding rectangle of each circle
-__global__ void kernelRenderCircleBoundingRectangles(CircleParams* cudaDeviceCircleParams) {
+__global__ void kernelRenderCircleBoundingRectanglesAndInit(CircleParams* cudaDeviceCircleParams, int* cudaLatestDependency) {
 
     int index = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (index >= cuConstRendererParams.numCircles)
         return;
 
+    cudaLatestDependency[index] = -2;
     int index3 = 3 * index;
 
     // read position and radius
@@ -521,38 +523,62 @@ __global__ void kernelRenderCircles(CircleParams* cudaDeviceCircleParams, int* c
     if (index >= cuConstRendererParams.numCircles) {
         return; 
     }
-    if(cudaCircleProcessingComplete[index]){
+    bool completed = cudaCircleProcessingComplete[index];
+    __syncthreads(); 
+    if(completed){
         return;
     }
-    
     CircleParams myParams = cudaDeviceCircleParams[index];
     int index3 = 3 * index;
     float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
     float rad = cuConstRendererParams.radius[index];
-
     float invWidth = 1.0f / cuConstRendererParams.imageWidth;
     float invHeight = 1.0f / cuConstRendererParams.imageHeight;
-    bool safeToDraw = true;
-    for (int i = index - 1; i >= 0; i--) {
-        // If an earlier circle isn't done yet...
-        if (!cudaCircleProcessingComplete[i]) {
-            CircleParams otherParams = cudaDeviceCircleParams[i];
-            
-            float boxL = otherParams.screenMinX * invWidth;
-            float boxR = otherParams.screenMaxX * invWidth;
-            float boxB = otherParams.screenMinY * invHeight;
-            float boxT = otherParams.screenMaxY * invHeight;
-
-            // Check if they might overlap
-            if (circleInBoxConservative(p.x, p.y, rad, boxL, boxR, boxT, boxB)) {
-                if (circleInBox(p.x, p.y, rad, boxL, boxR, boxT, boxB)) {
-                    // We overlap an unfinished circle! We must abort and try again later.
-                    safeToDraw = false;
-                    break;
+    
+    if(threadIdx.x == 0){
+        int latestDependency = cudaLatestDependency[index];
+        if(latestDependency != -1){
+            int startSearchIndex = latestDependency;
+            if(latestDependency == -2){
+                startSearchIndex = index -1;
+            }else{
+                bool latestDependencyComplete = cudaCircleProcessingComplete[latestDependency];
+                if(latestDependencyComplete){
+                    startSearchIndex = latestDependency - 1;
                 }
+            }
+            bool reachedEnd = true;
+            for (int i = startSearchIndex; i >= 0; i--) {
+                if (!cudaCircleProcessingComplete[i]) {
+                    CircleParams otherParams = cudaDeviceCircleParams[i];
+                    
+                    float boxL = otherParams.screenMinX * invWidth;
+                    float boxR = otherParams.screenMaxX * invWidth;
+                    float boxB = otherParams.screenMinY * invHeight;
+                    float boxT = otherParams.screenMaxY * invHeight;
+
+                    if (circleInBoxConservative(p.x, p.y, rad, boxL, boxR, boxT, boxB)) {
+                        if (circleInBox(p.x, p.y, rad, boxL, boxR, boxT, boxB)) {
+                            cudaLatestDependency[index] = i;
+                            reachedEnd = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            if(reachedEnd){
+                cudaLatestDependency[index] = -1;
             }
         }
     }
+    bool safeToDraw = false;
+    __syncthreads(); 
+     int latestDependency = cudaLatestDependency[index];
+     __syncthreads(); 
+    if(latestDependency == -1){
+        safeToDraw = true;
+    }
+
 
     if (!safeToDraw) {
         return;
@@ -828,11 +854,26 @@ CudaRenderer::advanceAnimation() {
 void
 CudaRenderer::render() {
 
+    cudaEvent_t start, stop;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
+
+    cudaEventRecord(start);
+
     // 256 threads per block is a healthy number
     dim3 blockDim(256, 1);
     dim3 gridDim((numCircles + blockDim.x - 1) / blockDim.x);
 
-    kernelRenderCircleBoundingRectangles<<<gridDim, blockDim>>>(cudaDeviceCircleParams);
+    kernelRenderCircleBoundingRectanglesAndInit<<<gridDim, blockDim>>>(cudaDeviceCircleParams, cudaLatestDependency);
+
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+
+    // 5. Calculate and print the elapsed time
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    printf("kernelRenderCircleBoundingRectanglesAndInit time: %f ms\n", milliseconds);
+
     cudaError_t err = cudaDeviceSynchronize();
     if (err != cudaSuccess) {
         printf("GPU CRASHED in kernelRenderCircleBoundingRectangles: %s\n", cudaGetErrorString(err));
@@ -847,12 +888,23 @@ CudaRenderer::render() {
     dim3 blockDim2(256, 1);
     dim3 gridDim2(numCircles);
     bool toContinue = true;
+    int iteration = 0;
     while(toContinue){
+        // printf("Iteration: %d \n", iteration);
+        
+        auto startTime = std::chrono::high_resolution_clock::now();
         kernelRenderCircles<<<gridDim2, blockDim2>>>(cudaDeviceCircleParams, cudaLatestDependency, cudaCircleProcessingComplete);
+
         err = cudaDeviceSynchronize();
         if (err != cudaSuccess) {
             printf("GPU CRASHED in kernelRenderCircles: %s\n", cudaGetErrorString(err));
         }
+        auto stopTime = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float, std::milli> duration = stopTime - startTime;
+    
+        // printf("Total kernelRenderCircles time: %f ms\n", duration.count());
+        
+        auto startTimeForMemCpy = std::chrono::high_resolution_clock::now();
         cudaMemcpy(circleProcessingComplete, cudaCircleProcessingComplete, sizeof(bool) * numCircles, cudaMemcpyDeviceToHost);
         bool allProcessed = true;
         for(int i = 0; i < numCircles; i++){
@@ -864,6 +916,11 @@ CudaRenderer::render() {
         if(allProcessed){
             toContinue = false;
         }
+        // auto stopTimeForMemCpy = std::chrono::high_resolution_clock::now();
+        // std::chrono::duration<float, std::milli> durationForMemCpy = stopTimeForMemCpy - startTimeForMemCpy;
+    
+        // printf("Total cudaMemcpy time: %f ms\n", durationForMemCpy.count());
+        iteration += 1;
     }
 
 }
