@@ -32,6 +32,7 @@ class CudaRenderer : public CircleRenderer {
   int* cudaLatestDependency;
   bool* cudaCircleProcessingComplete;
   int* cudaCirclesCompleted;
+  int * cudaCirclesOverlap;
 
  public:
   CudaRenderer();
@@ -53,6 +54,7 @@ class CudaRenderer : public CircleRenderer {
 
   void shadePixel(int circleIndex, float pixelCenterX, float pixelCenterY,
                   float px, float py, float pz, float* pixelData);
+    unsigned int nextPowerOf2(unsigned int n);
 };
 
 #endif

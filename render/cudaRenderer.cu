@@ -676,6 +676,7 @@ CudaRenderer::~CudaRenderer() {
         cudaFree(cudaLatestDependency);
         cudaFree(cudaCircleProcessingComplete);
         cudaFree(cudaCirclesCompleted);
+        cudaFree(cudaCirclesOverlap);
     }
 }
 
@@ -743,6 +744,7 @@ CudaRenderer::setup() {
     cudaMalloc(&cudaLatestDependency, sizeof(int) * numCircles);
     cudaMalloc(&cudaCircleProcessingComplete, sizeof(bool) * numCircles);
     cudaMalloc(&cudaCirclesCompleted, sizeof(int));
+    // cudaMalloc(&cudaCirclesOverlap, sizeof(int) * 1024 * numCircles);
 
 
     cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
@@ -750,6 +752,8 @@ CudaRenderer::setup() {
     cudaMemcpy(cudaDeviceColor, color, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaDeviceRadius, radius, sizeof(float) * numCircles, cudaMemcpyHostToDevice);
     cudaMemset(cudaCircleProcessingComplete, false, sizeof(bool) * numCircles);
+    // cudaMemset(cudaCirclesOverlap, 0, sizeof(int) * 1024 * numCircles);
+
 
     // Initialize parameters in constant memory.  We didn't talk about
     // constant memory in class, but the use of read-only constant
@@ -853,7 +857,7 @@ CudaRenderer::advanceAnimation() {
     cudaDeviceSynchronize();
 }
 
-__global__ void kernelRenderCirclesPerPixel() {
+__global__ void kernelRenderCirclesPerPixel(unsigned int nextPowerOfTwo) {
     //Localize the tile we are evaluating for
     short imageWidth = cuConstRendererParams.imageWidth;
     short imageHeight = cuConstRendererParams.imageHeight;
@@ -869,16 +873,39 @@ __global__ void kernelRenderCirclesPerPixel() {
     int screenMinY = (minY > 0) ? ((minY < imageHeight) ? minY : imageHeight) : 0;
     int screenMaxY = (maxY > 0) ? ((maxY < imageHeight) ? maxY : imageHeight) : 0;
 
+    int numberOfCircles = cuConstRendererParams.numCircles;
+    
     int circleIndex = threadIdx.y * blockDim.x + threadIdx.x;
     int increment = blockDim.x  * blockDim.y;
-    int numTasks = cuConstRendererParams.numCircles;
+    int numTasks = numberOfCircles;
+    float invWidth = 1.0f / imageWidth;
+    float invHeight = 1.0f / imageHeight;
     for (int i = circleIndex; i < numTasks ; i += increment){
-        
+        int index = i;
+        int index3 = 3 * i;
+        float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
+        float rad = cuConstRendererParams.radius[index];
+        float boxL = screenMinX * invWidth;
+        float boxR = screenMaxX * invWidth;
+        float boxB = screenMinY * invHeight;
+        float boxT = screenMaxY * invHeight;
+        int results = circleInBoxConservative(p.x, p.y, rad, boxL, boxR, boxT, boxB);
+        if(results == 1){
+            results = circleInBox(p.x, p.y, rad, boxL, boxR, boxT, boxB);
+            if(results == 1){
+                circleOverlapArray[i] = 1;
+            }
+        }
     }
 
 
 
 
+}
+
+unsigned int CudaRenderer::nextPowerOf2(unsigned int n) {
+    if (n <= 1) return 1;
+    return 1 << (32 - __builtin_clz(n - 1));
 }
 
 void
