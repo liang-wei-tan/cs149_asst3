@@ -853,71 +853,40 @@ CudaRenderer::advanceAnimation() {
     cudaDeviceSynchronize();
 }
 
+__global__ void kernelRenderCirclesPerPixel() {
+    //Localize the tile we are evaluating for
+    short imageWidth = cuConstRendererParams.imageWidth;
+    short imageHeight = cuConstRendererParams.imageHeight;
+
+    int blockX = blockIdx.x;
+    int blockY = blockIdx.y;
+    int minX = blockDim.x * blockX;
+    int minY = blockDim.y * blockY;
+    int maxX = minX + blockDim.x;
+    int maxY = minY + blockDim.y;
+    int screenMinX = (minX > 0) ? ((minX < imageWidth) ? minX : imageWidth) : 0;
+    int screenMaxX = (maxX > 0) ? ((maxX < imageWidth) ? maxX : imageWidth) : 0;
+    int screenMinY = (minY > 0) ? ((minY < imageHeight) ? minY : imageHeight) : 0;
+    int screenMaxY = (maxY > 0) ? ((maxY < imageHeight) ? maxY : imageHeight) : 0;
+
+    int circleIndex = threadIdx.y * blockDim.x + threadIdx.x;
+    int increment = blockDim.x  * blockDim.y;
+    int numTasks = cuConstRendererParams.numCircles;
+    for (int i = circleIndex; i < numTasks ; i += increment){
+        
+    }
+
+
+
+
+}
+
 void
 CudaRenderer::render() {
+    dim3 blockDim(32, 32);
+    dim3 gridDim(image->height + blockDim.x - 1 / blockDim.x , image->width + blockDim.y - 1 / blockDim.y);
 
-    cudaEvent_t start, stop;
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    kernelRenderCirclesPerPixel<<<gridDim, blockDim>>>();
 
-    cudaEventRecord(start);
-
-    // 256 threads per block is a healthy number
-    dim3 blockDim(256, 1);
-    dim3 gridDim((numCircles + blockDim.x - 1) / blockDim.x);
-
-    kernelRenderCircleBoundingRectanglesAndInit<<<gridDim, blockDim>>>(cudaDeviceCircleParams, cudaLatestDependency);
-
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-
-    // 5. Calculate and print the elapsed time
-    float milliseconds = 0;
-    cudaEventElapsedTime(&milliseconds, start, stop);
-    printf("kernelRenderCircleBoundingRectanglesAndInit time: %f ms\n", milliseconds);
-
-    cudaError_t err = cudaDeviceSynchronize();
-    if (err != cudaSuccess) {
-        printf("GPU CRASHED in kernelRenderCircleBoundingRectangles: %s\n", cudaGetErrorString(err));
-    }
-
-    // kernelComputeDependency<<<gridDim, blockDim>>>(cudaDeviceCircleParams, cudaLatestDependency);
-    // err = cudaDeviceSynchronize();
-    // if (err != cudaSuccess) {
-    //     printf("GPU CRASHED in kernelComputeDependency: %s\n", cudaGetErrorString(err));
-    // }
-
-    dim3 blockDim2(256, 1);
-    dim3 gridDim2(numCircles);
-    bool toContinue = true;
-    int iteration = 0;
-    int hostCirclesCompleted = 0;
-    while(toContinue){
-        // printf("Iteration: %d \n", iteration);
-        
-        auto startTime = std::chrono::high_resolution_clock::now();
-        kernelRenderCircles<<<gridDim2, blockDim2>>>(cudaDeviceCircleParams, cudaLatestDependency, cudaCircleProcessingComplete, cudaCirclesCompleted);
-
-        err = cudaDeviceSynchronize();
-        if (err != cudaSuccess) {
-            printf("GPU CRASHED in kernelRenderCircles: %s\n", cudaGetErrorString(err));
-        }
-        auto stopTime = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<float, std::milli> duration = stopTime - startTime;
-    
-        // printf("Total kernelRenderCircles time: %f ms\n", duration.count());
-        
-        auto startTimeForMemCpy = std::chrono::high_resolution_clock::now();
-        // cudaMemcpy(circleProcessingComplete, cudaCircleProcessingComplete, sizeof(bool) * numCircles, cudaMemcpyDeviceToHost);
-        cudaMemcpy(&hostCirclesCompleted, cudaCirclesCompleted, sizeof(int), cudaMemcpyDeviceToHost);
-        if(hostCirclesCompleted == numCircles){
-            toContinue = false;
-        }
-        // auto stopTimeForMemCpy = std::chrono::high_resolution_clock::now();
-        // std::chrono::duration<float, std::milli> durationForMemCpy = stopTimeForMemCpy - startTimeForMemCpy;
-    
-        // printf("Total cudaMemcpy time: %f ms\n", durationForMemCpy.count());
-        iteration += 1;
-    }
 
 }
