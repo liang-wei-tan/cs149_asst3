@@ -881,6 +881,7 @@ __global__ void kernelRenderCirclesPerPixel() {
     __shared__ uint sIn[BLOCKSIZE];
     __shared__ uint sOut[BLOCKSIZE];
     __shared__ uint scratch[BLOCKSIZE * 2];
+    __shared__ uint queue[BLOCKSIZE];
     
     int circleIndex = threadIdx.y * blockDim.x + threadIdx.x;
     int increment = blockDim.x  * blockDim.y;
@@ -905,10 +906,36 @@ __global__ void kernelRenderCirclesPerPixel() {
         }else{
             sIn[index] = 0;
         }
-        __syncthreads();
+        __syncthreads(); 
         int linearThreadIndex =  threadIdx.y * blockDim.x + threadIdx.x;
         sharedMemExclusiveScan(linearThreadIndex, sIn, sOut, scratch, BLOCKSIZE);
-        
+        __syncthreads();
+
+        int max_index = sOut[BLOCKSIZE - 1];
+        if(linearThreadIndex == BLOCKSIZE - 1){
+            if(sIn[linearThreadIndex] == 1){
+                queue[max_index + 1] = index;
+                max_index += 1;
+            }
+        }else if(sOut[linearThreadIndex] != sOut[linearThreadIndex + 1]){
+            queue[sOut[linearThreadIndex]] = index;
+        }
+
+        // now let's start shading pixels
+        for(int j = 0; j < max_index; j++){
+            int circleIndex = queue[j];
+            int index3 = 3 * circleIndex;
+            float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
+            int pixelX = threadIdx.x + screenMinX;
+            int pixelY = threadIdx.y + screenMinY;
+            if(pixelX < screenMaxX && pixelY < screenMaxY){
+                float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * (pixelY * imageWidth + pixelX)]);
+                float2 pixelCenterNorm = make_float2(invWidth * (static_cast<float>(pixelX) + 0.5f), invHeight * (static_cast<float>(pixelY) + 0.5f));
+                shadePixel(circleIndex, pixelCenterNorm, p, imgPtr);
+            }
+        }
+
+        __syncthreads();
     }
 
 
