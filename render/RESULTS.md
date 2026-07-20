@@ -302,3 +302,64 @@ Score table:
 --------------------------------------------------------------------------
 |                                    | Total score:    | 69/72           |
 --------------------------------------------------------------------------
+
+### Iteration 9: enabling update of local variable instead of global for repeated shade pixel operation
+Now hit benchmarks
+./checker.py 
+
+Running scene: rgb...
+[rgb] Correctness passed!
+[rgb] Student times:  [0.2307, 0.226, 0.2306]
+[rgb] Reference times:  [0.1973, 0.2041, 0.199]
+
+Running scene: rand10k...
+[rand10k] Correctness passed!
+[rand10k] Student times:  [2.4463, 2.4407, 2.4461]
+[rand10k] Reference times:  [3.0047, 3.0007, 3.0007]
+
+Running scene: rand100k...
+[rand100k] Correctness passed!
+[rand100k] Student times:  [24.1558, 24.1647, 24.1603]
+[rand100k] Reference times:  [28.8208, 28.8362, 28.8473]
+
+Running scene: pattern...
+[pattern] Correctness passed!
+[pattern] Student times:  [0.3388, 0.3406, 0.3434]
+[pattern] Reference times:  [0.3614, 0.3652, 0.3625]
+
+Running scene: snowsingle...
+[snowsingle] Correctness passed!
+[snowsingle] Student times:  [9.6962, 9.6936, 9.6945]
+[snowsingle] Reference times:  [18.5367, 18.5321, 18.5326]
+
+Running scene: biglittle...
+[biglittle] Correctness passed!
+[biglittle] Student times:  [18.5615, 18.5717, 18.5564]
+[biglittle] Reference times:  [16.4733, 16.4975, 16.4759]
+
+Running scene: rand1M...
+[rand1M] Correctness passed!
+[rand1M] Student times:  [105.4135, 105.4173, 105.4175]
+[rand1M] Reference times:  [179.9347, 179.5622, 179.5756]
+
+Running scene: micro2M...
+[micro2M] Correctness passed!
+[micro2M] Student times:  [182.4985, 182.4935, 182.4954]
+[micro2M] Reference times:  [344.4716, 343.4235, 343.4612]
+------------
+Score table:
+------------
+--------------------------------------------------------------------------
+| Scene Name      | Ref Time (T_ref) | Your Time (T)   | Score           |
+--------------------------------------------------------------------------
+| rgb             | 0.1973           | 0.226           | 9               |
+| rand10k         | 3.0007           | 2.4407          | 9               |
+| rand100k        | 28.8208          | 24.1558         | 9               |
+| pattern         | 0.3614           | 0.3388          | 9               |
+| snowsingle      | 18.5321          | 9.6936          | 9               |
+| biglittle       | 16.4733          | 18.5564         | 9               |
+| rand1M          | 179.5622         | 105.4135        | 9               |
+| micro2M         | 343.4235         | 182.4935        | 9               |
+--------------------------------------------------------------------------
+|                                    | Total score:    | 72/72           |
+--------------------------------------------------------------------------

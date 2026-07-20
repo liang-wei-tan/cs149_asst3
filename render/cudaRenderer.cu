@@ -1,5 +1,5 @@
-#define BLOCKSIZE 256
-#define SCAN_BLOCK_DIM 256
+#define BLOCKSIZE 1024
+#define SCAN_BLOCK_DIM 1024
 
 #include <string>
 #include <algorithm>
@@ -931,18 +931,20 @@ __global__ void kernelRenderCirclesPerPixel() {
 
 
         // now let's start shading pixels
+        int pixelX = threadIdx.x + screenMinX;
+        int pixelY = threadIdx.y + screenMinY;
+        float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * (pixelY * imageWidth + pixelX)]);
+        float4 tempImgPtr = *imgPtr;
         for(int j = 0; j < max_index; j++){
             int circleIndex = queue[j];
             int index3 = 3 * circleIndex;
             float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
-            int pixelX = threadIdx.x + screenMinX;
-            int pixelY = threadIdx.y + screenMinY;
             if(pixelX <= screenMaxX && pixelY <= screenMaxY){
-                float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * (pixelY * imageWidth + pixelX)]);
                 float2 pixelCenterNorm = make_float2(invWidth * (static_cast<float>(pixelX) + 0.5f), invHeight * (static_cast<float>(pixelY) + 0.5f));
-                shadePixel(circleIndex, pixelCenterNorm, p, imgPtr);
+                shadePixel(circleIndex, pixelCenterNorm, p, &tempImgPtr);
             }
         }
+        *imgPtr = tempImgPtr;
 
         __syncthreads();
     }
@@ -950,7 +952,7 @@ __global__ void kernelRenderCirclesPerPixel() {
 
 void
 CudaRenderer::render() {
-    dim3 blockDim(16, 16);
+    dim3 blockDim(32, 32);
     dim3 gridDim((image->width + blockDim.x - 1) / blockDim.x, 
              (image->height + blockDim.y - 1) / blockDim.y);
 
