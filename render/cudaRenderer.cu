@@ -1,3 +1,6 @@
+#define BLOCKSIZE 1024
+#define SCAN_BLOCK_DIM 1024
+
 #include <string>
 #include <algorithm>
 #include <math.h>
@@ -14,6 +17,7 @@
 #include "noise.h"
 #include "sceneLoader.h"
 #include "util.h"
+#include "exclusiveScan.cu_inl"
 
 ////////////////////////////////////////////////////////////////////////////////////////
 // Putting all the cuda kernels here
@@ -857,7 +861,7 @@ CudaRenderer::advanceAnimation() {
     cudaDeviceSynchronize();
 }
 
-__global__ void kernelRenderCirclesPerPixel(unsigned int nextPowerOfTwo) {
+__global__ void kernelRenderCirclesPerPixel() {
     //Localize the tile we are evaluating for
     short imageWidth = cuConstRendererParams.imageWidth;
     short imageHeight = cuConstRendererParams.imageHeight;
@@ -874,6 +878,9 @@ __global__ void kernelRenderCirclesPerPixel(unsigned int nextPowerOfTwo) {
     int screenMaxY = (maxY > 0) ? ((maxY < imageHeight) ? maxY : imageHeight) : 0;
 
     int numberOfCircles = cuConstRendererParams.numCircles;
+    __shared__ uint sIn[BLOCKSIZE];
+    __shared__ uint sOut[BLOCKSIZE];
+    __shared__ uint scratch[BLOCKSIZE * 2];
     
     int circleIndex = threadIdx.y * blockDim.x + threadIdx.x;
     int increment = blockDim.x  * blockDim.y;
@@ -893,9 +900,15 @@ __global__ void kernelRenderCirclesPerPixel(unsigned int nextPowerOfTwo) {
         if(results == 1){
             results = circleInBox(p.x, p.y, rad, boxL, boxR, boxT, boxB);
             if(results == 1){
-                circleOverlapArray[i] = 1;
+                sIn[index] = 1;
             }
+        }else{
+            sIn[index] = 0;
         }
+        __syncthreads();
+        int linearThreadIndex =  threadIdx.y * blockDim.x + threadIdx.x;
+        sharedMemExclusiveScan(linearThreadIndex, sIn, sOut, scratch, BLOCKSIZE);
+        
     }
 
 
