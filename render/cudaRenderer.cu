@@ -509,10 +509,8 @@ __global__ void kernelComputeDependency(CircleParams* cudaDeviceCircleParams, in
         float boxT = circleForCompare.screenMaxY * invHeight;
         int results = circleInBoxConservative(p.x, p.y, rad, boxL, boxR, boxT, boxB);
         if(results == 1){
-            // printf("came in \n");
             results = circleInBox(p.x, p.y, rad, boxL, boxR, boxT, boxB);
             if(results == 1){
-                // printf("came in 2\n");
                 cudaLatestDependency[index] = i;
                 break;
             }
@@ -531,7 +529,6 @@ __global__ void kernelRenderCircles(CircleParams* cudaDeviceCircleParams, int* c
     if(completed){
         return;
     }
-    CircleParams myParams = cudaDeviceCircleParams[index];
     int index3 = 3 * index;
     float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
     float rad = cuConstRendererParams.radius[index];
@@ -878,27 +875,23 @@ __global__ void kernelRenderCirclesPerPixel() {
     int screenMaxY = (maxY > 0) ? ((maxY < imageHeight) ? maxY : imageHeight) : 0;
 
     int numberOfCircles = cuConstRendererParams.numCircles;
+    int linearThreadIndex =  threadIdx.y * blockDim.x + threadIdx.x;
     __shared__ uint sIn[BLOCKSIZE];
     __shared__ uint sOut[BLOCKSIZE];
     __shared__ uint scratch[BLOCKSIZE * 2];
     __shared__ uint queue[BLOCKSIZE];
-    for(int i = 0; i < BLOCKSIZE; i++){
-        sIn[i] = 0;
-        sOut[i] = 0;
-        scratch[i] = 0;
-        queue[i] = 0;
-        scratch[i + BLOCKSIZE] = 0;
-    }
+    sIn[linearThreadIndex] = 0;
+    sOut[linearThreadIndex] = 0;
+    scratch[linearThreadIndex] = 0;
+    queue[linearThreadIndex] = 0;
+    scratch[linearThreadIndex + BLOCKSIZE] = 0;
     __syncthreads();
     
-    int circleIndex = threadIdx.y * blockDim.x + threadIdx.x;
-    int increment = blockDim.x  * blockDim.y;
     int numTasks = numberOfCircles;
     float invWidth = 1.0f / imageWidth;
     float invHeight = 1.0f / imageHeight;
     int numChunks = (numTasks + BLOCKSIZE - 1) / BLOCKSIZE;
     for (int chunk = 0; chunk < numChunks; chunk++) {
-        int linearThreadIndex =  threadIdx.y * blockDim.x + threadIdx.x;
         int i = chunk * BLOCKSIZE + linearThreadIndex;
         if (i < numTasks) {
             int index3 = 3 * i;
@@ -917,7 +910,6 @@ __global__ void kernelRenderCirclesPerPixel() {
                 sIn[linearThreadIndex] = 0;
             }
         } else {
-            // Crucial: Threads beyond numTasks still participate in the scan!
             sIn[linearThreadIndex] = 0; 
         }
         __syncthreads(); 
@@ -927,42 +919,19 @@ __global__ void kernelRenderCirclesPerPixel() {
         int max_index = sOut[BLOCKSIZE - 1] + sIn[BLOCKSIZE - 1];
         __syncthreads();
 
-              if(threadIdx.x == 0 && threadIdx.y == 0 && blockIdx.x == 15 && blockIdx.y == 25){
-                if(sIn[0] == 1 || sIn[1] == 1 || sIn[2] == 1){
-                // printf(" sIn[0] %d\n", sIn[0]);
-                // printf(" sIn[1] %d\n", sIn[1]);
-                // printf(" sIn[2] %d\n", sIn[2]);
-                printf("sOut[0] %d\n", sOut[0]);
-                printf("sOut[1] %d\n", sOut[1]);
-                printf("grididxx %d, grididxy %d, sOut[2] %d\n", blockIdx.x, blockIdx.y, sOut[2]);
-                printf("sOut[3] %d\n", sOut[3]);
-                printf("sOut[4] %d\n", sOut[4]);
-                printf("max index %d\n", max_index);
-                }
-                
-                // printf(" third circle %d\n", queue[2]);
-                // printf(" max index %d\n", max_index);
-            }
         if(linearThreadIndex == BLOCKSIZE - 1){
             if(sIn[linearThreadIndex] == 1){
-                queue[max_index] = i;
+                queue[max_index-1] = i;
             }
         }else if(sOut[linearThreadIndex] != sOut[linearThreadIndex + 1]){
             queue[sOut[linearThreadIndex]] = i;
         }
 
-         if(threadIdx.x == 0 && threadIdx.y == 0){
-                // printf("first circle %d\n", queue[0]);
-                // printf(" second circle %d\n", queue[1]);
-                // printf(" third circle %d\n", queue[2]);
-                // printf(" max index %d\n", max_index);
-            }
+        __syncthreads();
+
 
         // now let's start shading pixels
         for(int j = 0; j < max_index; j++){
-            if(threadIdx.x == 0 && threadIdx.y == 0){
-                printf("Shading circle %d\n", queue[j]);
-            }
             int circleIndex = queue[j];
             int index3 = 3 * circleIndex;
             float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
