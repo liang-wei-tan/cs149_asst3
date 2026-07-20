@@ -901,10 +901,10 @@ __global__ void kernelRenderCirclesPerPixel() {
         if(results == 1){
             results = circleInBox(p.x, p.y, rad, boxL, boxR, boxT, boxB);
             if(results == 1){
-                sIn[index] = 1;
+                sIn[index % 1024] = 1;
             }
         }else{
-            sIn[index] = 0;
+            sIn[index % 1024] = 0;
         }
         __syncthreads(); 
         int linearThreadIndex =  threadIdx.y * blockDim.x + threadIdx.x;
@@ -928,7 +928,7 @@ __global__ void kernelRenderCirclesPerPixel() {
             float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
             int pixelX = threadIdx.x + screenMinX;
             int pixelY = threadIdx.y + screenMinY;
-            if(pixelX < screenMaxX && pixelY < screenMaxY){
+            if(pixelX <= screenMaxX && pixelY <= screenMaxY){
                 float4* imgPtr = (float4*)(&cuConstRendererParams.imageData[4 * (pixelY * imageWidth + pixelX)]);
                 float2 pixelCenterNorm = make_float2(invWidth * (static_cast<float>(pixelX) + 0.5f), invHeight * (static_cast<float>(pixelY) + 0.5f));
                 shadePixel(circleIndex, pixelCenterNorm, p, imgPtr);
@@ -937,10 +937,6 @@ __global__ void kernelRenderCirclesPerPixel() {
 
         __syncthreads();
     }
-
-
-
-
 }
 
 unsigned int CudaRenderer::nextPowerOf2(unsigned int n) {
