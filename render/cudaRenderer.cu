@@ -1,5 +1,5 @@
-#define BLOCKSIZE 1024
-#define SCAN_BLOCK_DIM 1024
+#define BLOCKSIZE 256
+#define SCAN_BLOCK_DIM 256
 
 #include <string>
 #include <algorithm>
@@ -950,7 +950,7 @@ __global__ void kernelRenderCirclesPerPixel() {
 
 void
 CudaRenderer::render() {
-    dim3 blockDim(32, 32);
+    dim3 blockDim(16, 16);
     dim3 gridDim((image->width + blockDim.x - 1) / blockDim.x, 
              (image->height + blockDim.y - 1) / blockDim.y);
 

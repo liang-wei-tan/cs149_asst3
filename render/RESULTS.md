@@ -180,3 +180,125 @@ Running scene: biglittle...
 [biglittle] Correctness passed!
 [biglittle] Student times:  [676.0049, 676.1458, 676.0125]
 [biglittle] Reference times:  [4.9781, 4.9662, 4.9594]
+
+### Iteration 7 Pixel level parallelism
+Much faster
+./checker.py 
+
+Running scene: rgb...
+[rgb] Correctness passed!
+[rgb] Student times:  [0.2122, 0.2127, 0.2168]
+[rgb] Reference times:  [0.1993, 0.1972, 0.1922]
+
+Running scene: rand10k...
+[rand10k] Correctness passed!
+[rand10k] Student times:  [2.9748, 2.968, 2.979]
+[rand10k] Reference times:  [3.0037, 3.0263, 3.007]
+
+Running scene: rand100k...
+[rand100k] Correctness passed!
+[rand100k] Student times:  [29.1365, 29.1321, 29.1442]
+[rand100k] Reference times:  [28.8535, 28.8656, 28.8618]
+
+Running scene: pattern...
+[pattern] Correctness passed!
+[pattern] Student times:  [0.3549, 0.3557, 0.3527]
+[pattern] Reference times:  [0.358, 0.3659, 0.3594]
+
+Running scene: snowsingle...
+[snowsingle] Correctness passed!
+[snowsingle] Student times:  [9.0834, 9.0873, 9.0861]
+[snowsingle] Reference times:  [18.5373, 18.5428, 18.5441]
+
+Running scene: biglittle...
+[biglittle] Correctness passed!
+[biglittle] Student times:  [33.541, 33.5225, 33.5007]
+[biglittle] Reference times:  [16.4629, 16.4485, 16.4699]
+
+Running scene: rand1M...
+[rand1M] Correctness passed!
+[rand1M] Student times:  [105.201, 103.4609, 103.466]
+[rand1M] Reference times:  [180.3849, 180.9225, 180.9018]
+
+Running scene: micro2M...
+[micro2M] Correctness passed!
+[micro2M] Student times:  [174.4362, 174.4585, 174.4665]
+[micro2M] Reference times:  [346.0611, 346.1787, 346.0944]
+------------
+Score table:
+------------
+--------------------------------------------------------------------------
+| Scene Name      | Ref Time (T_ref) | Your Time (T)   | Score           |
+--------------------------------------------------------------------------
+| rgb             | 0.1922           | 0.2122          | 9               |
+| rand10k         | 3.0037           | 2.968           | 9               |
+| rand100k        | 28.8535          | 29.1321         | 9               |
+| pattern         | 0.358            | 0.3527          | 9               |
+| snowsingle      | 18.5373          | 9.0834          | 9               |
+| biglittle       | 16.4485          | 33.5007         | 6               |
+| rand1M          | 180.3849         | 103.4609        | 9               |
+| micro2M         | 346.0611         | 174.4362        | 9               |
+--------------------------------------------------------------------------
+|                                    | Total score:    | 69/72           |
+--------------------------------------------------------------------------
+
+### Iteration 8 decrease block size to 16 by 16
+Performance is a bit worse.
+./checker.py 
+
+Running scene: rgb...
+[rgb] Correctness passed!
+[rgb] Student times:  [0.1646, 0.1648, 0.1609]
+[rgb] Reference times:  [0.1948, 0.1911, 0.2044]
+
+Running scene: rand10k...
+[rand10k] Correctness passed!
+[rand10k] Student times:  [3.5683, 3.5625, 3.5569]
+[rand10k] Reference times:  [3.0006, 3.0091, 3.0077]
+
+Running scene: rand100k...
+[rand100k] Correctness passed!
+[rand100k] Student times:  [34.5234, 34.5184, 34.5175]
+[rand100k] Reference times:  [28.8254, 28.8273, 28.8537]
+
+Running scene: pattern...
+[pattern] Correctness passed!
+[pattern] Student times:  [0.4088, 0.3995, 0.4071]
+[pattern] Reference times:  [0.3829, 0.3767, 0.3842]
+
+Running scene: snowsingle...
+[snowsingle] Correctness passed!
+[snowsingle] Student times:  [19.5662, 19.5594, 19.5862]
+[snowsingle] Reference times:  [18.5458, 18.5323, 18.5397]
+
+Running scene: biglittle...
+[biglittle] Correctness passed!
+[biglittle] Student times:  [32.3366, 32.3575, 32.3394]
+[biglittle] Reference times:  [16.5166, 16.5013, 16.4797]
+
+Running scene: rand1M...
+[rand1M] Correctness passed!
+[rand1M] Student times:  [199.8981, 198.4788, 199.4487]
+[rand1M] Reference times:  [180.49, 180.4947, 180.4928]
+
+Running scene: micro2M...
+[micro2M] Correctness passed!
+[micro2M] Student times:  [363.3832, 363.3372, 366.2342]
+[micro2M] Reference times:  [347.0796, 347.0821, 347.084]
+------------
+Score table:
+------------
+--------------------------------------------------------------------------
+| Scene Name      | Ref Time (T_ref) | Your Time (T)   | Score           |
+--------------------------------------------------------------------------
+| rgb             | 0.1911           | 0.1609          | 9               |
+| rand10k         | 3.0006           | 3.5569          | 9               |
+| rand100k        | 28.8254          | 34.5175         | 9               |
+| pattern         | 0.3767           | 0.3995          | 9               |
+| snowsingle      | 18.5323          | 19.5594         | 9               |
+| biglittle       | 16.4797          | 32.3366         | 6               |
+| rand1M          | 180.49           | 198.4788        | 9               |
+| micro2M         | 347.0796         | 363.3372        | 9               |
+--------------------------------------------------------------------------
+|                                    | Total score:    | 69/72           |
+--------------------------------------------------------------------------
